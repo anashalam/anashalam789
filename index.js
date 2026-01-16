@@ -21,7 +21,7 @@ const trackUserAction = require('./middleware/aiTracking');
 const aiClient = require('./utils/aiClient');
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8800;
 
 // Ensure upload directories exist
 const uploadDirs = ['uploads', 'uploads/profiles'];
