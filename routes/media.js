@@ -244,42 +244,41 @@ router.post('/upload', authenticate, (req, res) => {
 });
 
 // Delete song (protected)
+// ... (Purana storage aur upload logic sahi hai)
+
+// DELETE ROUTE FIXED
 router.delete('/delete/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Check if user owns this song
         const songResult = await db.query(
-            `SELECT m.file_url, a.user_id 
+            `SELECT m.file_url, m.thumbnail_url, a.user_id 
              FROM media m
              JOIN artists a ON m.artist_id = a.id
              WHERE m.id = $1`,
             [id]
         );
 
-        if (songResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Song not found' });
-        }
+        if (songResult.rows.length === 0) return res.status(404).json({ error: 'Song not found' });
 
         const song = songResult.rows[0];
+        if (song.user_id !== req.user.userId) return res.status(403).json({ error: 'Unauthorized' });
 
-        if (song.user_id !== req.user.userId) {
-            return res.status(403).json({ error: 'Unauthorized' });
-        }
+        // Files delete karne ka sahi tarika
+        const deleteFile = (relativePath) => {
+            if (relativePath) {
+                const fullPath = path.join(__dirname, '..', relativePath);
+                if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+            }
+        };
 
-        // Delete file
-        if (fs.existsSync(song.file_url)) {
-            fs.unlinkSync(song.file_url);
-        }
+        deleteFile(song.file_url);
+        deleteFile(song.thumbnail_url);
 
-        // Delete from database
         await db.query('DELETE FROM media WHERE id = $1', [id]);
-
-        res.json({ message: 'Deleted' });
+        res.json({ message: 'Deleted successfully' });
     } catch (error) {
-        console.error('Delete error:', error);
-        res.status(500).json({ error: 'Action Failed' });
+        res.status(500).json({ error: 'Delete Failed' });
     }
 });
 
-module.exports = router;
