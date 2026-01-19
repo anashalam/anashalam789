@@ -183,24 +183,32 @@ router.get('/details/:id', async (req, res) => {
 
 // Upload song (protected)
 // Upload song (protected)
+// 1. Pehle define karein ki kaunsi files accept karni hain
+const songUpload = upload.fields([
+    { name: 'file', maxCount: 1 },    // Ye aapka audio file hai
+    { name: 'thumble', maxCount: 1 }  // Ye aapka thumbnail image hai
+]);
+
 router.post('/upload', authenticate, (req, res) => {
-    // 1. Multer ko manually handle karein taaki busboy error catch ho sake
-    upload.single('file')(req, res, async (err) => {
+    // 2. upload.fields use karein upload.single ki jagah
+    songUpload(req, res, async (err) => {
         if (err) {
             console.error('Multer/Busboy Error:', err);
-            return res.status(400).json({ error: 'File upload error. Check your Postman headers!' });
+            return res.status(400).json({ error: 'Upload error. Make sure field names are "file" and "thumble"' });
         }
 
         try {
             const { title, genre } = req.body;
-            const file = req.file;
+            
+            // 3. Files access karne ka naya tarika
+            const audioFile = req.files['file'] ? req.files['file'][0] : null;
+            const thumbFile = req.files['thumble'] ? req.files['thumble'][0] : null;
 
-            // Basic validation
-            if (!file || !title) {
+            if (!audioFile || !title) {
                 return res.status(400).json({ error: 'Missing required fields (file and title)' });
             }
 
-            // 2. Sirf Artist Check karein (User check ki alag se zarurat nahi kyunki authenticate middleware hai)
+            // Artist Check
             const artistResult = await db.query(
                 'SELECT id FROM artists WHERE user_id = $1',
                 [req.user.userId]
@@ -212,16 +220,22 @@ router.post('/upload', authenticate, (req, res) => {
 
             const artistId = artistResult.rows[0].id;
 
-            // 3. Database Query (Hum id ko DB par chhod rahe hain - gen_random_uuid)
+            // 4. Database Insert (Added thumbnail_url column)
             const newMedia = await db.query(
-                `INSERT INTO media (artist_id, title, genre, file_url, views) 
-                 VALUES ($1, $2, $3, $4, 0) 
-                 RETURNING id`, // Returning id taaki humein pata chale kya generate hua
-                [artistId, title, genre || 'Unknown', `/uploads/${file.filename}`]
+                `INSERT INTO media (artist_id, title, genre, file_url, thumbnail_url, views) 
+                 VALUES ($1, $2, $3, $4, $5, 0) 
+                 RETURNING id`,
+                [
+                    artistId, 
+                    title, 
+                    genre || 'Unknown', 
+                    `/uploads/${audioFile.filename}`,
+                    thumbFile ? `/uploads/${thumbFile.filename}` : null
+                ]
             );
 
             res.status(201).json({ 
-                message: 'Uploaded!',
+                message: 'Uploaded Successfully!',
                 song_id: newMedia.rows[0].id
             });
 
