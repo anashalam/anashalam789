@@ -182,51 +182,54 @@ router.get('/details/:id', async (req, res) => {
 });
 
 // Upload song (protected)
-router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
-    try {
-        const { title, genre } = req.body;
-        const file = req.file;
-
-        if (!file || !title) {
-            return res.status(400).json({ error: 'Missing required fields' });
+// Upload song (protected)
+router.post('/upload', authenticate, (req, res) => {
+    // 1. Multer ko manually handle karein taaki busboy error catch ho sake
+    upload.single('file')(req, res, async (err) => {
+        if (err) {
+            console.error('Multer/Busboy Error:', err);
+            return res.status(400).json({ error: 'File upload error. Check your Postman headers!' });
         }
 
-        // Get user's artist ID
-        const userResult = await db.query(
-            'SELECT id FROM users WHERE id = $1',
-            [req.user.userId]
-        );
+        try {
+            const { title, genre } = req.body;
+            const file = req.file;
 
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+            // Basic validation
+            if (!file || !title) {
+                return res.status(400).json({ error: 'Missing required fields (file and title)' });
+            }
+
+            // 2. Sirf Artist Check karein (User check ki alag se zarurat nahi kyunki authenticate middleware hai)
+            const artistResult = await db.query(
+                'SELECT id FROM artists WHERE user_id = $1',
+                [req.user.userId]
+            );
+
+            if (artistResult.rows.length === 0) {
+                return res.status(403).json({ error: 'Only registered artists can upload songs' });
+            }
+
+            const artistId = artistResult.rows[0].id;
+
+            // 3. Database Query (Hum id ko DB par chhod rahe hain - gen_random_uuid)
+            const newMedia = await db.query(
+                `INSERT INTO media (artist_id, title, genre, file_url, views) 
+                 VALUES ($1, $2, $3, $4, 0) 
+                 RETURNING id`, // Returning id taaki humein pata chale kya generate hua
+                [artistId, title, genre || 'Unknown', `/uploads/${file.filename}`]
+            );
+
+            res.status(201).json({ 
+                message: 'Uploaded!',
+                song_id: newMedia.rows[0].id
+            });
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            res.status(500).json({ error: 'Server database error' });
         }
-
-        const artistResult = await db.query(
-            'SELECT id FROM artists WHERE user_id = $1',
-            [req.user.userId]
-        );
-
-        if (artistResult.rows.length === 0) {
-            return res.status(403).json({ error: 'User is not an artist' });
-        }
-
-        const artistId = artistResult.rows[0].id;
-        const songId = uuidv4();
-
-        await db.query(
-            `INSERT INTO media (id, artist_id, title, genre, file_url, views) 
-             VALUES ($1, $2, $3, $4, $5, 0)`,
-            [songId, artistId, title, genre || 'Unknown', `uploads/${file.filename}`]
-        );
-
-        res.status(201).json({ 
-            message: 'Uploaded!',
-            song_id: songId
-        });
-    } catch (error) {
-        console.error('Upload error:', error);
-        res.status(500).json({ error: 'Upload failed' });
-    }
+    });
 });
 
 // Delete song (protected)
