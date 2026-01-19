@@ -181,9 +181,6 @@ router.get('/details/:id', async (req, res) => {
     }
 });
 
-// Upload song (protected)
-// Upload song (protected)
-// 1. Pehle define karein ki kaunsi files accept karni hain
 const songUpload = upload.fields([
     { name: 'file', maxCount: 1 },    // Ye aapka audio file hai
     { name: 'thumble', maxCount: 1 }  // Ye aapka thumbnail image hai
