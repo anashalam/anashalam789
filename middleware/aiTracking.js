@@ -1,4 +1,4 @@
-const db = require('../config/database');
+const db = require('../config/database').default;
 const { v4: uuidv4 } = require('uuid');
 
 const trackUserAction = async (req, res, next) => {

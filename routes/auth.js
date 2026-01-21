@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const db = require('../config/database');
+const db = require('../config/database').default;
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'SUPER_SECRET_KEY';
