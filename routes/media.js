@@ -7,7 +7,7 @@ const { authenticate } = require('../middleware/auth');
 const db = require('../config/database');
 const router = express.Router();
 
-// AB YE LINE CHALEGI
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
         const ext = path.extname(file.originalname);
         cb(null, `${uuidv4()}${ext}`);
     }
-})
+});
 
 const upload = multer({ storage });
 
@@ -184,34 +184,40 @@ const songUpload = upload.fields([
     { name: 'file', maxCount: 1 },
     { name: 'thumble', maxCount: 1 }
 ]);
-router.post('/upload', authenticate, (req, res) => {
-    songUpload(req, res, async (err) => {
-        if (err) {
-            console.error('Multer Error:', err);
-            return res.status(400).json({ error: 'Upload error. Use "file" and "thumble" fields.' });
+router.post('/upload', authenticate, upload.fields([
+    { name: 'file', maxCount: 1 },
+    { name: 'thumble', maxCount: 1 }
+]), async (req, res) => {
+    try {
+        const { title, genre } = req.body;
+        
+        // 1. Check if files exist
+        if (!req.files || !req.files['file']) {
+            return res.status(400).json({ error: 'Audio file is required' });
         }
-        try {
-            const { title, genre } = req.body;
-            const audioFile = req.files['file'] ? req.files['file'][0] : null;
-            const thumbFile = req.files['thumble'] ? req.files['thumble'][0] : null;
 
-            if (!audioFile || !title) {
-                return res.status(400).json({ error: 'Missing required fields' });
-            }
-
-            const artistResult = await db.query('SELECT id FROM artists WHERE user_id = $1', [req.user.userId]);
-            if (artistResult.rows.length === 0) return res.status(403).json({ error: 'Not an artist' });
-
-            const newMedia = await db.query(
-                `INSERT INTO media (artist_id, title, genre, file_url, thumbnail_url, views) 
-                 VALUES ($1, $2, $3, $4, $5, 0) RETURNING id`,
-                [artistResult.rows[0].id, title, genre || 'Unknown', `/uploads/${audioFile.filename}`, thumbFile ? `/uploads/${thumbFile.filename}` : null]
-            );
-            res.status(201).json({ message: 'Uploaded!', song_id: newMedia.rows[0].id });
-        } catch (error) {
-            res.status(500).json({ error: 'DB Error' });
+        // 2. Find Artist ID from User ID
+        const artistResult = await db.query('SELECT id FROM artists WHERE user_id = $1', [req.user.userId]);
+        
+        if (artistResult.rows.length === 0) {
+            return res.status(403).json({ error: 'Only registered artists can upload songs' });
         }
-    });
+
+        const artist_id = artistResult.rows[0].id;
+        const file_url = `/uploads/${req.files['file'][0].filename}`;
+        const thumbnail_url = req.files['thumble'] ? `/uploads/${req.files['thumble'][0].filename}` : null;
+
+        // 3. Insert into Database
+        const newMedia = await db.query(
+            'INSERT INTO media (artist_id, title, genre, file_url, thumbnail_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [artist_id, title, genre, file_url, thumbnail_url]
+        );
+
+        res.status(201).json(newMedia.rows[0]);
+    } catch (error) {
+        console.error('Upload Error Details:', error); // Ye log Railway par dikhega
+        res.status(500).json({ error: 'Database or Upload failed' });
+    }
 });
 
 // Delete song (protected)
