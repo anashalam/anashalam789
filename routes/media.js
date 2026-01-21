@@ -1,14 +1,14 @@
 const express = require('express');
-const multer = require('multer');
+const multer = require('multer'); 
 const path = require('path');
 const fs = require('fs');
-const { authenticate } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
+const { authenticate } = require('../middleware/auth');
 const db = require('../config/database');
 
 const router = express.Router();
 
-// Configure multer for file uploads
+// AB YE LINE CHALEGI
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = 'uploads/';
@@ -21,7 +21,7 @@ const storage = multer.diskStorage({
         const ext = path.extname(file.originalname);
         cb(null, `${uuidv4()}${ext}`);
     }
-});
+})
 
 const upload = multer({ storage });
 
@@ -182,63 +182,35 @@ router.get('/details/:id', async (req, res) => {
 });
 
 const songUpload = upload.fields([
-    { name: 'file', maxCount: 1 },    // Ye aapka audio file hai
-    { name: 'thumble', maxCount: 1 }  // Ye aapka thumbnail image hai
+    { name: 'file', maxCount: 1 },
+    { name: 'thumble', maxCount: 1 }
 ]);
-
 router.post('/upload', authenticate, (req, res) => {
-    // 2. upload.fields use karein upload.single ki jagah
     songUpload(req, res, async (err) => {
         if (err) {
-            console.error('Multer/Busboy Error:', err);
-            return res.status(400).json({ error: 'Upload error. Make sure field names are "file" and "thumble"' });
+            console.error('Multer Error:', err);
+            return res.status(400).json({ error: 'Upload error. Use "file" and "thumble" fields.' });
         }
-
         try {
             const { title, genre } = req.body;
-            
-            // 3. Files access karne ka naya tarika
             const audioFile = req.files['file'] ? req.files['file'][0] : null;
             const thumbFile = req.files['thumble'] ? req.files['thumble'][0] : null;
 
             if (!audioFile || !title) {
-                return res.status(400).json({ error: 'Missing required fields (file and title)' });
+                return res.status(400).json({ error: 'Missing required fields' });
             }
 
-            // Artist Check
-            const artistResult = await db.query(
-                'SELECT id FROM artists WHERE user_id = $1',
-                [req.user.userId]
-            );
+            const artistResult = await db.query('SELECT id FROM artists WHERE user_id = $1', [req.user.userId]);
+            if (artistResult.rows.length === 0) return res.status(403).json({ error: 'Not an artist' });
 
-            if (artistResult.rows.length === 0) {
-                return res.status(403).json({ error: 'Only registered artists can upload songs' });
-            }
-
-            const artistId = artistResult.rows[0].id;
-
-            // 4. Database Insert (Added thumbnail_url column)
             const newMedia = await db.query(
                 `INSERT INTO media (artist_id, title, genre, file_url, thumbnail_url, views) 
-                 VALUES ($1, $2, $3, $4, $5, 0) 
-                 RETURNING id`,
-                [
-                    artistId, 
-                    title, 
-                    genre || 'Unknown', 
-                    `/uploads/${audioFile.filename}`,
-                    thumbFile ? `/uploads/${thumbFile.filename}` : null
-                ]
+                 VALUES ($1, $2, $3, $4, $5, 0) RETURNING id`,
+                [artistResult.rows[0].id, title, genre || 'Unknown', `/uploads/${audioFile.filename}`, thumbFile ? `/uploads/${thumbFile.filename}` : null]
             );
-
-            res.status(201).json({ 
-                message: 'Uploaded Successfully!',
-                song_id: newMedia.rows[0].id
-            });
-
+            res.status(201).json({ message: 'Uploaded!', song_id: newMedia.rows[0].id });
         } catch (error) {
-            console.error('Upload error:', error);
-            res.status(500).json({ error: 'Server database error' });
+            res.status(500).json({ error: 'DB Error' });
         }
     });
 });
@@ -250,35 +222,28 @@ router.post('/upload', authenticate, (req, res) => {
 router.delete('/delete/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
-
         const songResult = await db.query(
-            `SELECT m.file_url, m.thumbnail_url, a.user_id 
-             FROM media m
-             JOIN artists a ON m.artist_id = a.id
-             WHERE m.id = $1`,
-            [id]
+            `SELECT m.file_url, m.thumbnail_url, a.user_id FROM media m 
+             JOIN artists a ON m.artist_id = a.id WHERE m.id = $1`, [id]
         );
-
-        if (songResult.rows.length === 0) return res.status(404).json({ error: 'Song not found' });
+        if (songResult.rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
         const song = songResult.rows[0];
         if (song.user_id !== req.user.userId) return res.status(403).json({ error: 'Unauthorized' });
 
-        // Files delete karne ka sahi tarika
-        const deleteFile = (relativePath) => {
-            if (relativePath) {
-                const fullPath = path.join(__dirname, '..', relativePath);
+        const deleteFile = (relPath) => {
+            if (relPath) {
+                const fullPath = path.join(__dirname, '..', relPath); // Path fixing
                 if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
             }
         };
-
         deleteFile(song.file_url);
         deleteFile(song.thumbnail_url);
 
         await db.query('DELETE FROM media WHERE id = $1', [id]);
-        res.json({ message: 'Deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ error: 'Delete Failed' });
-    }
+        res.json({ message: 'Deleted' });
+    } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
+// media.js ke bilkul end mein ye hona chahiye:
+module.exports = router;

@@ -54,7 +54,7 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/media', mediaRoutes);
+app.use('/api/v1/media', mediaRoutes); // Line 57
 app.use('/api/v1/artists', artistRoutes);
 app.use('/api/v1/social', authenticate, socialRoutes);
 app.use('/api/v1/playlists', authenticate, playlistRoutes);
