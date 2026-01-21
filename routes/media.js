@@ -4,8 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { authenticate } = require('../middleware/auth');
-const db = require('../config/database').default;
-
+const db = require('../config/database');
 const router = express.Router();
 
 // AB YE LINE CHALEGI
