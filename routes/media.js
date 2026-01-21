@@ -208,10 +208,11 @@ router.post('/upload', authenticate, upload.fields([
         const thumbnail_url = req.files['thumble'] ? `/uploads/${req.files['thumble'][0].filename}` : null;
 
         // 3. Insert into Database
-        const newMedia = await db.query(
-            'INSERT INTO media (artist_id, title, genre, file_url, thumbnail_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [artist_id, title, genre, file_url, thumbnail_url]
-        );
+     // Agar aapki table mein column ka naam 'thumbnail' hai, toh yahan bhi wahi hona chahiye
+const newMedia = await db.query(
+    'INSERT INTO media (artist_id, title, genre, file_url, thumbnail_url) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [artist_id, title, genre, file_url, thumbnail_url] // 👈 Ye wala naam database se match hona chahiye
+);
 
         res.status(201).json(newMedia.rows[0]);
     } catch (error) {
