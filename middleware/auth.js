@@ -21,10 +21,13 @@ const authenticate = (req, res, next) => {
 };
 
 const isAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required' });
+    // .toLowerCase() lagane se 'ADMIN' aur 'admin' dono sahi mane jayenge
+    if (req.user && req.user.role.toLowerCase() === 'admin') {
+        next();
+    } else {
+        res.status(403).json({ error: 'Access denied. Admins only.' });
     }
-    next();
+    
 };
 
 module.exports = {  authenticate, isAdmin};
