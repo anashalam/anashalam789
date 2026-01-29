@@ -9,20 +9,12 @@ const authenticate = (req, res, next) => {
         return res.status(401).json({ error: 'No token provided' });
     }
 
-   // Jahan login success hota hai wahan aisa hona chahiye:
-const token = jwt.sign(
-    { 
-        id: user.id, 
-        email: user.email, 
-        role: user.role // 👈 Ye line hona MUST hai!
-    }, 
-    JWT_SECRET, 
-    { expiresIn: '24h' }
-);
+    const token = authHeader.split(' ')[1];
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
+        // Token ke andar ka saara data (id, role, etc.) req.user mein aa jayega
+        req.user = decoded; 
         next();
     } catch (error) {
         return res.status(401).json({ error: 'Invalid token' });
@@ -30,17 +22,18 @@ const token = jwt.sign(
 };
 
 const isAdmin = (req, res, next) => {
-    console.log("Token Data:", req.user); // 👈 Ye add karein
-    
+    // Ye console.log aapko Render ke logs mein bata dega ki token mein kya hai
+    console.log("Debug Token User:", req.user);
+
     if (req.user && req.user.role && req.user.role.toLowerCase() === 'admin') {
         next();
     } else {
         res.status(403).json({ 
             error: 'Access denied. Admins only.',
-            receivedRole: req.user ? req.user.role : 'No Role Found' 
+            received_role: req.user ? req.user.role : "None"
         });
     }
-    
 };
 
+module.exports = { authenticate, isAdmin };
 module.exports = {  authenticate, isAdmin};
