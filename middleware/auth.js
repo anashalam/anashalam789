@@ -9,7 +9,16 @@ const authenticate = (req, res, next) => {
         return res.status(401).json({ error: 'No token provided' });
     }
 
-    const token = authHeader.split(' ')[1];
+   // Jahan login success hota hai wahan aisa hona chahiye:
+const token = jwt.sign(
+    { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role // 👈 Ye line hona MUST hai!
+    }, 
+    JWT_SECRET, 
+    { expiresIn: '24h' }
+);
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -21,11 +30,15 @@ const authenticate = (req, res, next) => {
 };
 
 const isAdmin = (req, res, next) => {
-    // .toLowerCase() lagane se 'ADMIN' aur 'admin' dono sahi mane jayenge
-    if (req.user && req.user.role.toLowerCase() === 'admin') {
+    console.log("Token Data:", req.user); // 👈 Ye add karein
+    
+    if (req.user && req.user.role && req.user.role.toLowerCase() === 'admin') {
         next();
     } else {
-        res.status(403).json({ error: 'Access denied. Admins only.' });
+        res.status(403).json({ 
+            error: 'Access denied. Admins only.',
+            receivedRole: req.user ? req.user.role : 'No Role Found' 
+        });
     }
     
 };
