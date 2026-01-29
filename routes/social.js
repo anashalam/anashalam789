@@ -1,8 +1,7 @@
 const express = require('express');
 const { authenticate } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
-const db = require('../config/database').default;
-
+const db = require('../config/database'); // 👈 Ye check karein ki path sahi hai ya nahi
 const router = express.Router();
 
 // Follow artist
